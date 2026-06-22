@@ -1,0 +1,16 @@
+terraform-provider-allinkl
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+*.tfvars
+!*.auto.tfvars.example
+
+# Local Claude Code project instructions - not part of the distributed provider
+CLAUDE.md
+
+# GPG release-signing material - never commit these
+gpg-private-key.asc
+gpg-public-key.asc
+gpg-fingerprint.txt

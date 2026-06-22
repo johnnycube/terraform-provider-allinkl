@@ -1,0 +1,24 @@
+---
+page_title: "{{.RenderedProviderName}} Provider"
+description: |-
+  Manage all-inkl.com (KAS) resources via the KAS SOAP API.
+---
+
+# {{.RenderedProviderName}} Provider
+
+Manages all-inkl.com (KAS) hosting resources through the KAS SOAP API: DNS
+records, mail accounts, mail forwards and subdomains, with the account's
+domains as a data source.
+
+~> **Unofficial.** Not affiliated with, endorsed by, or supported by
+all-inkl.com (Neue Medien Münnich GmbH). "all-inkl" and "KAS" name the service
+this talks to, nothing more.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+The KAS API enforces flood protection between requests; the provider serializes
+calls and honors the announced delays, so large plans apply slowly by design.
+
+{{ .SchemaMarkdown | trimspace }}

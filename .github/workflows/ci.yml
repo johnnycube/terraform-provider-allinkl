@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"; echo "$out"; exit 1
+          fi
+
+      - name: Resolve dependencies
+        run: go mod tidy && git diff --exit-code go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests (race detector)
+        run: go test -race -count=1 ./...
+
+  # Acceptance tests run a real Terraform/OpenTofu binary against the provider,
+  # which talks to an in-process fake KAS server - no credentials required. The
+  # matrix exercises both CLIs and a min/latest spread to catch protocol drift.
+  acceptance:
+    name: acceptance (${{ matrix.tool }} ${{ matrix.version }})
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tool: opentofu, version: latest }
+          - { tool: opentofu, version: "1.8.0" }
+          - { tool: terraform, version: latest }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - if: matrix.tool == 'opentofu'
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ matrix.version }}
+          tofu_wrapper: false
+      - if: matrix.tool == 'terraform'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ matrix.version }}
+          terraform_wrapper: false
+      - name: Acceptance tests (fake KAS backend)
+        env:
+          TF_ACC: "1"
+          # TestMain pins the reattach namespace to "hashicorp" so OpenTofu does
+          # not reject the legacy "-" namespace. The harness also requires an
+          # absolute binary path, hence command -v below.
+          TF_ACC_PROVIDER_NAMESPACE: hashicorp
+        run: |
+          if [ "${{ matrix.tool }}" = "opentofu" ]; then
+            export TF_ACC_TERRAFORM_PATH="$(command -v tofu)"
+            export TF_ACC_PROVIDER_HOST=registry.opentofu.org
+          else
+            export TF_ACC_TERRAFORM_PATH="$(command -v terraform)"
+            export TF_ACC_PROVIDER_HOST=registry.terraform.io
+          fi
+          go test -count=1 -timeout 15m ./internal/provider/
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-file: go.mod
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Generated docs are up to date
+        run: |
+          make generate
+          git diff --exit-code -- docs/ || {
+            echo "docs/ is stale - run 'make generate' and commit the result."; exit 1; }

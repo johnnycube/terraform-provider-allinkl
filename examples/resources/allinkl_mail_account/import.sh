@@ -1,0 +1,1 @@
+terraform import allinkl_mail_account.info m1234567

@@ -1,0 +1,73 @@
+// Renovate configuration for github.com/johnnycube/terraform-provider-allinkl
+// Docs: https://docs.renovatebot.com/configuration-options/
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+
+  extends: [
+    // config:recommended + GitHub Actions digest pinning + config migration.
+    'config:best-practices',
+    ':semanticCommits',
+    'schedule:earlyMondays',
+  ],
+
+  timezone: 'Europe/Berlin',
+  labels: ['dependencies'],
+
+  // Supply-chain caution; security fixes bypass this (vulnerabilityAlerts).
+  minimumReleaseAge: '3 days',
+
+  postUpdateOptions: ['gomodTidy', 'gomodUpdateImportPaths'],
+
+  packageRules: [
+    {
+      description: 'The HashiCorp plugin SDK moves in lockstep - update terraform-plugin-* together so framework/validators/testing stay compatible.',
+      matchManagers: ['gomod'],
+      matchPackageNames: ['github.com/hashicorp/terraform-plugin-**'],
+      groupName: 'terraform-plugin SDK',
+    },
+    {
+      description: 'Our own API library: individual PR, clearly labeled, never automerged - its changelog is the review.',
+      matchManagers: ['gomod'],
+      matchPackageNames: ['github.com/johnnycube/kasapi'],
+      groupName: 'kasapi library',
+      labels: ['dependencies', 'internal'],
+      automerge: false,
+      prPriority: 5,
+    },
+    {
+      description: 'Group remaining non-major Go updates into one weekly PR.',
+      matchManagers: ['gomod'],
+      matchUpdateTypes: ['minor', 'patch'],
+      matchPackageNames: [
+        '!github.com/hashicorp/terraform-plugin-**',
+        '!github.com/johnnycube/kasapi',
+      ],
+      groupName: 'go dependencies (non-major)',
+    },
+    {
+      description: 'Major updates (incl. SDK majors) need explicit approval via the dependency dashboard - they may require code changes.',
+      matchManagers: ['gomod'],
+      matchUpdateTypes: ['major'],
+      dependencyDashboardApproval: true,
+    },
+    {
+      description: 'GitHub Actions: digest/non-major bumps automerge once the full CI (unit + acceptance tests) is green.',
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['minor', 'patch', 'pin', 'digest'],
+      automerge: true,
+    },
+    {
+      description: 'Go toolchain bumps are individual, approval-gated PRs.',
+      matchManagers: ['gomod'],
+      matchDepTypes: ['golang'],
+      groupName: 'go toolchain',
+      dependencyDashboardApproval: true,
+    },
+  ],
+
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    labels: ['security'],
+    prPriority: 10,
+  },
+}
