@@ -42,7 +42,7 @@ import (
 // override if the caller already set one.
 func TestMain(m *testing.M) {
 	if os.Getenv("TF_ACC_PROVIDER_NAMESPACE") == "" {
-		os.Setenv("TF_ACC_PROVIDER_NAMESPACE", "hashicorp")
+		_ = os.Setenv("TF_ACC_PROVIDER_NAMESPACE", "hashicorp")
 	}
 	// resource.TestMain handles the -sweep flag (see sweep_test.go) and
 	// otherwise runs the tests; it calls os.Exit itself.

@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -54,7 +55,12 @@ func main() {
 	log.Printf("fake KAS listening on http://%s (login: any, password: %q)", *addr, password)
 	log.Printf("  KAS_AUTH_ENDPOINT=http://%s/KasAuth.php", *addr)
 	log.Printf("  KAS_API_ENDPOINT=http://%s/KasApi.php", *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
 }
 
 var paramsRe = regexp.MustCompile(`(?s)<Params[^>]*>(.*?)</Params>`)
@@ -88,7 +94,7 @@ func (b *backend) serve(w http.ResponseWriter, r *http.Request) {
 			writeFault(w, "kas_login_incorrect")
 			return
 		}
-		fmt.Fprint(w, envelope(`<return xsi:type="xsd:string">`+token+`</return>`))
+		_, _ = fmt.Fprint(w, envelope(`<return xsi:type="xsd:string">`+token+`</return>`))
 		return
 	}
 
@@ -105,7 +111,7 @@ func (b *backend) serve(w http.ResponseWriter, r *http.Request) {
 		writeFault(w, fault)
 		return
 	}
-	fmt.Fprint(w, envelope(`<return>
+	_, _ = fmt.Fprint(w, envelope(`<return>
   <item><key>Request</key><value></value></item>
   <item><key>Response</key><value>
     <item><key>ReturnString</key><value>TRUE</value></item>
@@ -350,7 +356,7 @@ func envelope(inner string) string {
 
 func writeFault(w http.ResponseWriter, code string) {
 	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprint(w, `<?xml version="1.0"?>
+	_, _ = fmt.Fprint(w, `<?xml version="1.0"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
  <SOAP-ENV:Body><SOAP-ENV:Fault>
   <faultcode>SOAP-ENV:Server</faultcode>

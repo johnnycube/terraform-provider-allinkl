@@ -8,6 +8,12 @@ linters:
     - unparam
     - gosec
   settings:
+    misspell:
+      # "adress" is the spelling KAS uses for its mail address fields
+      # (mail_copy_adress, copy_adress_, mail_adresses, ...); it is part of the
+      # wire protocol, not a typo we can fix.
+      ignore-rules:
+        - adress
     gosec:
       excludes:
         # G401/G505: SHA1 is mandated by the KAS API auth protocol
