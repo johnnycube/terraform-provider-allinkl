@@ -18,6 +18,15 @@ Fixed (via kasapi v0.2.0):
 - Forward targets are sent as `target_0..target_9` (0-indexed), not
   `target_1..N`, which silently dropped one of ten targets.
 
+Dependencies:
+
+- terraform-plugin-framework 1.19.0, -framework-validators 0.19.0,
+  -go 0.31.0, -log 0.10.0, -testing 1.16.0.
+- Go 1.26.5, fixing the crypto/tls Encrypted Client Hello privacy leak
+  ([GO-2026-5856](https://pkg.go.dev/vuln/GO-2026-5856)) flagged by
+  govulncheck.
+- GitHub Actions in CI are pinned to commit digests.
+
 ## v0.1.0 (2026-06-17)
 
 First release.
