@@ -38,6 +38,7 @@ type fakeAccount struct {
 	address  string
 	password string
 	copies   []string
+	aliases  []string
 }
 
 func newFakeBackend() *fakeBackend {
@@ -123,6 +124,7 @@ func (b *fakeBackend) handle(action string, params map[string]any) (string, stri
 				kasapitest.MapItem("mail_adresses", acc.address) +
 				kasapitest.MapItem("mail_responder", "N") +
 				kasapitest.MapItem("mail_copy_adress", strings.Join(acc.copies, ",")) +
+				kasapitest.MapItem("mail_sender_alias", strings.Join(acc.aliases, ",")) +
 				"</item>"
 		}
 		return out, ""
@@ -136,7 +138,8 @@ func (b *fakeBackend) handle(action string, params map[string]any) (string, stri
 		b.accounts[login] = &fakeAccount{
 			address:  str("local_part") + "@" + str("domain_part"),
 			password: str("mail_password"),
-			copies:   collectIndexed(params, "copy_adress_", 0),
+			copies:   splitList(str("copy_adress")),
+			aliases:  splitList(str("mail_sender_alias")),
 		}
 		return login, ""
 
@@ -147,8 +150,14 @@ func (b *fakeBackend) handle(action string, params map[string]any) (string, stri
 		}
 		if pw := str("mail_new_password"); pw != "" {
 			acc.password = pw
-		} else {
-			acc.copies = collectIndexed(params, "copy_adress_", 0)
+		}
+		// Both lists are sent as one comma-separated parameter; an empty
+		// value clears the list, so presence of the key is what matters.
+		if _, ok := params["copy_adress"]; ok {
+			acc.copies = splitList(str("copy_adress"))
+		}
+		if _, ok := params["mail_sender_alias"]; ok {
+			acc.aliases = splitList(str("mail_sender_alias"))
 		}
 		return "TRUE", ""
 
@@ -175,14 +184,14 @@ func (b *fakeBackend) handle(action string, params map[string]any) (string, stri
 		if _, exists := b.forwards[src]; exists {
 			return "", "mail_forward_exists"
 		}
-		b.forwards[src] = collectIndexed(params, "target_", 1)
+		b.forwards[src] = collectIndexed(params, "target_", 0)
 		return "TRUE", ""
 
 	case "update_mailforward":
 		if _, ok := b.forwards[str("mail_forward")]; !ok {
 			return "", "mail_forward_not_found"
 		}
-		b.forwards[str("mail_forward")] = collectIndexed(params, "target_", 1)
+		b.forwards[str("mail_forward")] = collectIndexed(params, "target_", 0)
 		return "TRUE", ""
 
 	case "delete_mailforward":
@@ -311,7 +320,21 @@ func (b *fakeBackend) seedMailAccount(localPart, domain string) {
 
 // --- helpers --------------------------------------------------------------------
 
-// collectIndexed gathers params named prefix0,prefix1,... (or 1-based) in order.
+// splitList splits a comma-separated address list, empty string -> nil.
+func splitList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+// collectIndexed gathers params named prefix0,prefix1,... in order.
 func collectIndexed(params map[string]any, prefix string, start int) []string {
 	var out []string
 	for i := start; ; i++ {

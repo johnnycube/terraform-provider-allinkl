@@ -46,6 +46,7 @@ type mailAccountModel struct {
 	Domain        types.String `tfsdk:"domain"`
 	Password      types.String `tfsdk:"password"`
 	CopyAddresses types.List   `tfsdk:"copy_addresses"`
+	SenderAliases types.List   `tfsdk:"sender_aliases"`
 	Address       types.String `tfsdk:"address"`
 }
 
@@ -104,6 +105,16 @@ func (r *mailAccountResource) Schema(_ context.Context, _ resource.SchemaRequest
 					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(3)),
 				},
 			},
+			"sender_aliases": schema.ListAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				MarkdownDescription: "Addresses the mailbox may use in the FROM header when sending. " +
+					"Aliases only affect sending; to receive mail under an alias, create an " +
+					"`allinkl_mail_forward` pointing at this mailbox instead.",
+				Validators: []validator.List{
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(3)),
+				},
+			},
 			"address": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full primary address (`local_part@domain`).",
@@ -133,6 +144,7 @@ func (r *mailAccountResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	copies := listToStrings(ctx, plan.CopyAddresses, &resp.Diagnostics)
+	aliases := listToStrings(ctx, plan.SenderAliases, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -161,6 +173,7 @@ func (r *mailAccountResource) Create(ctx context.Context, req resource.CreateReq
 		LocalPart:     plan.LocalPart.ValueString(),
 		Domain:        plan.Domain.ValueString(),
 		CopyAddresses: copies,
+		SenderAliases: aliases,
 	}, plan.Password.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create mail account", err.Error())
@@ -196,6 +209,9 @@ func (r *mailAccountResource) Read(ctx context.Context, req resource.ReadRequest
 	if len(acc.CopyAddresses) > 0 || !state.CopyAddresses.IsNull() {
 		state.CopyAddresses = stringsToList(ctx, acc.CopyAddresses, &resp.Diagnostics)
 	}
+	if len(acc.SenderAliases) > 0 || !state.SenderAliases.IsNull() {
+		state.SenderAliases = stringsToList(ctx, acc.SenderAliases, &resp.Diagnostics)
+	}
 	// password is write-only: keep whatever is in state.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -224,6 +240,17 @@ func (r *mailAccountResource) Update(ctx context.Context, req resource.UpdateReq
 		}
 		if err := r.client.Mail.UpdateCopyAddresses(ctx, login, copies); err != nil {
 			resp.Diagnostics.AddError("Failed to update copy addresses", err.Error())
+			return
+		}
+	}
+
+	if !plan.SenderAliases.Equal(state.SenderAliases) {
+		aliases := listToStrings(ctx, plan.SenderAliases, &resp.Diagnostics)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if err := r.client.Mail.UpdateSenderAliases(ctx, login, aliases); err != nil {
+			resp.Diagnostics.AddError("Failed to update sender aliases", err.Error())
 			return
 		}
 	}

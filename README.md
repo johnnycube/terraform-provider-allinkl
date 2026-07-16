@@ -64,6 +64,7 @@ resource "allinkl_mail_account" "info" {
   domain         = "example.com"   # forces replacement
   password       = var.mailbox_password
   copy_addresses = ["archive@example.org"]
+  sender_aliases = ["contact@example.com"]  # FROM addresses when sending
 }
 
 resource "allinkl_mail_forward" "sales" {
@@ -74,7 +75,9 @@ resource "allinkl_mail_forward" "sales" {
 ```
 
 The account `id` is the KAS-assigned mail login (`m1234567`), which is also the
-IMAP/SMTP username. The password is write-only: KAS never returns it, so drift
+IMAP/SMTP username. KAS has no standalone alias objects: `sender_aliases` are
+the addresses a mailbox may use in the FROM header when sending; to receive
+mail under an alias, create an `allinkl_mail_forward` pointing at the mailbox. The password is write-only: KAS never returns it, so drift
 on the password is not detectable and changing the value updates it. As with
 any Terraform secret it is persisted in state — protect the state accordingly.
 

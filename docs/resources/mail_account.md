@@ -18,6 +18,10 @@ resource "allinkl_mail_account" "info" {
   domain         = "example.com"
   password       = var.mailbox_password
   copy_addresses = ["archive@example.org"]
+
+  # Addresses this mailbox may send from. Receiving under an alias
+  # is a separate allinkl_mail_forward.
+  sender_aliases = ["contact@example.com"]
 }
 ```
 
@@ -33,6 +37,7 @@ resource "allinkl_mail_account" "info" {
 ### Optional
 
 - `copy_addresses` (List of String) Addresses that receive a copy of every incoming mail.
+- `sender_aliases` (List of String) Addresses the mailbox may use in the FROM header when sending. Aliases only affect sending; to receive mail under an alias, create an `allinkl_mail_forward` pointing at this mailbox instead.
 
 ### Read-Only
 

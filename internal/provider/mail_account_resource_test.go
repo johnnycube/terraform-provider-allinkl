@@ -29,11 +29,13 @@ resource "allinkl_mail_account" "info" {
   domain         = "example.com"
   password       = "first-Passw0rd"
   copy_addresses = ["archive@example.org"]
+  sender_aliases = ["contact@example.com"]
 }`,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("allinkl_mail_account.info", "id"),
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "address", "info@example.com"),
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "copy_addresses.#", "1"),
+					resource.TestCheckResourceAttr("allinkl_mail_account.info", "sender_aliases.0", "contact@example.com"),
 					func(_ *terraform.State) error {
 						if got := backend.passwordOf(backend.firstAccountLogin()); got != "first-Passw0rd" {
 							return fmt.Errorf("API received password %q", got)
@@ -42,7 +44,7 @@ resource "allinkl_mail_account" "info" {
 					},
 				),
 			},
-			// Update password and copy addresses in place (no replacement)
+			// Update password, copy addresses and sender aliases in place (no replacement)
 			{
 				Config: testAccProviderConfig + `
 resource "allinkl_mail_account" "info" {
@@ -50,9 +52,11 @@ resource "allinkl_mail_account" "info" {
   domain         = "example.com"
   password       = "second-Passw0rd"
   copy_addresses = ["archive@example.org", "backup@example.org"]
+  sender_aliases = ["contact@example.com", "hello@example.com"]
 }`,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "copy_addresses.#", "2"),
+					resource.TestCheckResourceAttr("allinkl_mail_account.info", "sender_aliases.#", "2"),
 					func(_ *terraform.State) error {
 						if backend.accountCount() != 1 {
 							return fmt.Errorf("expected in-place update, got %d accounts", backend.accountCount())
