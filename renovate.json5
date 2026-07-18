@@ -68,6 +68,5 @@
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     labels: ['security'],
-    prPriority: 10,
   },
 }
