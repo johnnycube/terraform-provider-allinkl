@@ -204,40 +204,47 @@ real account — see the notes below.
 
 ## Extending
 
-A new object type is a two-repository, two-file change. Email was added exactly
-this way; use it as the reference.
+A new object type is a change in two layers. Email was added exactly this way;
+use it as the reference.
 
-**1. API layer.** In the [kasapi library](https://github.com/johnnycube/kasapi),
-add a typed service over `Client.Exec` mirroring `dns.go` / `mail.go`:
+**1. API layer.** The [kasapi library](https://github.com/johnnycube/kasapi)
+has typed services for DNS, mail, domains, subdomains, TLS, FTP users,
+databases, cronjobs and dynamic DNS. For an object it does not cover, add a
+typed service over `Client.Exec` there, mirroring the existing ones:
 
 ```go
-type FTPService struct{ c *Client }
+type MailingListService struct{ c *Client }
 
-func (s *FTPService) Create(ctx context.Context, user, password, path string) error {
-    _, err := s.c.Exec(ctx, "add_ftpuser", map[string]any{
-        "ftp_user":     user,
-        "ftp_password": password,
-        "ftp_path":     path,
+func (s *MailingListService) Create(ctx context.Context, name, domain, password string) error {
+    _, err := s.c.Exec(ctx, "add_mailinglist", map[string]any{
+        "mailinglist_name":     name,
+        "mailinglist_domain":   domain,
+        "mailinglist_password": password,
     })
     return err
 }
 ```
 
-Register it in the library's `New()`: `c.FTP = &FTPService{c: c}`.
+Register it in the library's `New()`: `c.MailingLists = &MailingListService{c: c}`.
 
-**2. Terraform layer.** Add `internal/provider/ftp_user_resource.go` here,
+**2. Terraform layer.** Add `internal/provider/<object>_resource.go` here,
 following `dns_record_resource.go` / `mail_account_resource.go`, register the
 constructor in `provider.go`'s `Resources()`, and add the matching actions to
 `fake_backend_test.go` plus a lifecycle acceptance test.
 
-The KAS actions for the common cases already exist:
+kasapi serves these objects already; the provider does not expose them yet, so
+each one needs the Terraform layer only:
 
-| Use case        | KAS actions |
-|-----------------|-------------|
-| FTP users       | `get_ftpusers`, `add_ftpuser`, `update_ftpuser`, `delete_ftpuser` |
-| Databases       | `get_databases`, `add_database`, `update_database`, `delete_database` |
-| Cronjobs        | `get_cronjobs`, `add_cronjob`, `update_cronjob`, `delete_cronjob` |
-| Domains (write) | `add_domain`, `update_domain`, `delete_domain` — deliberately unexposed; see `allinkl_domains` |
+| Object | kasapi service |
+|--------|----------------|
+| FTP users | `FTP` |
+| Databases | `Databases` |
+| Cronjobs | `Cronjobs` |
+| Dynamic DNS users | `DDNS` |
+| TLS certificate, HTTPS redirect and HSTS of a host | `TLS` |
+| PHP version, redirect and active flag of a subdomain | `Subdomains.CreateWithSettings`, `Subdomains.Update` |
+| Autoresponder, access restrictions and filters of a mailbox | `Mail` |
+| Host settings of a domain | `Domains.Update` — `add_domain` and `delete_domain` stay deliberately unexposed; see `allinkl_domains` |
 
 Nothing in the transport, auth or flood-protection code changes.
 
