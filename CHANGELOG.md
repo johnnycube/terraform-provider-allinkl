@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.2.1 (2026-09-29)
+
+No changes to resources or data sources. This release rebuilds the provider
+on patched dependencies.
+
+Dependencies:
+
+- Go 1.26.8, fixing three standard-library advisories present in 1.26.5
+  ([GO-2026-6218](https://pkg.go.dev/vuln/GO-2026-6218) net/url,
+  [GO-2026-6091](https://pkg.go.dev/vuln/GO-2026-6091) html/template,
+  [GO-2026-6090](https://pkg.go.dev/vuln/GO-2026-6090) crypto/tls).
+- google.golang.org/grpc 1.83.2
+  ([GO-2026-6061](https://pkg.go.dev/vuln/GO-2026-6061),
+  GHSA-2v4p-qf9q-27wj) and golang.org/x/text 0.41.0
+  ([GO-2026-5970](https://pkg.go.dev/vuln/GO-2026-5970)). Both are indirect
+  dependencies of the provider framework.
+- terraform-plugin-log 0.11.0.
+- GitHub Actions in CI and the release workflow are on their current major
+  versions.
+
 ## v0.2.0 (2026-07-16)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.2.0.
