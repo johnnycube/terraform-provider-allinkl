@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.2 (2026-09-29)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. No changes to
 the schemas of resources or data sources.
