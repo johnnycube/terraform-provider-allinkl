@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. No changes to
+the schemas of resources or data sources.
+
+Changed (via kasapi v0.3):
+
+- An update that matches the current state succeeds. KAS answers such an
+  update with the fault `nothing_to_do`, which surfaced as an error.
+- A subdomain that no longer exists is recognized on update and delete. KAS
+  reports it as `subdomain_doenst_exist`, which was not read as "not found".
+- Reads ask KAS for the one object instead of the account's full list.
+
 ## v0.2.1 (2026-09-29)
 
 No changes to resources or data sources. This release rebuilds the provider
