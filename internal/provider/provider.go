@@ -178,6 +178,12 @@ func (p *allinklProvider) DataSources(_ context.Context) []func() datasource.Dat
 	return []func() datasource.DataSource{
 		NewDNSRecordsDataSource,
 		NewDomainsDataSource,
+		NewSubdomainsDataSource,
+		NewFTPUsersDataSource,
+		NewDatabasesDataSource,
+		NewCronjobsDataSource,
+		NewDDNSUsersDataSource,
+		NewMailFiltersDataSource,
 	}
 }
 
