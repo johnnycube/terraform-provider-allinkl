@@ -729,8 +729,9 @@ func (b *Backend) FirstAccountLogin() string {
 	return ""
 }
 
-// HostTLS returns the certificate and private key stored for a host.
-func (b *Backend) HostTLS(name string) (crt, key string) {
+// HostTLS returns the certificate and private key stored for a host and
+// whether the certificate is active.
+func (b *Backend) HostTLS(name string) (crt, key string, active bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	h := b.domains[name]
@@ -738,9 +739,9 @@ func (b *Backend) HostTLS(name string) (crt, key string) {
 		h = b.subdomains[name]
 	}
 	if h == nil {
-		return "", ""
+		return "", "", false
 	}
-	return h.Certificate, h.Key
+	return h.Certificate, h.Key, h.TLSActive == "j"
 }
 
 // SeedDNSRecord adds a record to the zone.
