@@ -14,7 +14,7 @@ TOFU="$(command -v tofu || command -v terraform || true)"
 
 mkdir -p "$BIN_DIR"
 
-echo "==> Building provider (against published kasapi v0.1.0)"
+echo "==> Building provider"
 ( cd "$REPO_ROOT" && GOWORK=off go build -o "$BIN_DIR/terraform-provider-allinkl" . )
 
 echo "==> Building + starting fake KAS server on $ADDR"
