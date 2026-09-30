@@ -53,8 +53,15 @@ func (m *databaseModel) fill(ctx context.Context, d *kasapi.Database, diags *dia
 	m.ID = types.StringValue(d.Login)
 	m.Name = types.StringValue(d.Name)
 	m.Comment = types.StringValue(d.Comment)
-	if len(d.AllowedHosts) > 0 || !m.AllowedHosts.IsNull() {
-		m.AllowedHosts = stringsToList(ctx, d.AllowedHosts, diags)
+	// KAS lists localhost on its own; only the external hosts are the user's.
+	var hosts []string
+	for _, h := range d.AllowedHosts {
+		if h != "localhost" {
+			hosts = append(hosts, h)
+		}
+	}
+	if len(hosts) > 0 || !m.AllowedHosts.IsNull() {
+		m.AllowedHosts = stringsToList(ctx, hosts, diags)
 	}
 }
 
@@ -92,7 +99,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"allowed_hosts": schema.ListAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Hosts allowed to connect from outside: IP addresses or CIDR networks. Unset keeps the database reachable from the hosting environment only.",
+				MarkdownDescription: "Hosts allowed to connect from outside: IP addresses or CIDR networks. Unset keeps the database reachable from the hosting environment only; `localhost`, which KAS lists on its own, is not part of the attribute.",
 				Validators:          []validator.List{listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1))},
 			},
 		},

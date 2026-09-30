@@ -484,7 +484,7 @@ func (b *Backend) Handle(action string, params map[string]any) (string, string) 
 			}
 			d := b.databases[login]
 			out += entry("database_name", login, "database_login", login, "database_password", d.Password,
-				"database_comment", d.Comment, "database_allowed_hosts", strings.Join(d.AllowedHosts, ", "),
+				"database_comment", d.Comment, "database_allowed_hosts", strings.Join(append([]string{"localhost"}, d.AllowedHosts...), ", "),
 				"used_database_space", "0", "in_progress", "FALSE")
 		}
 		return out, ""
@@ -542,7 +542,7 @@ func (b *Backend) Handle(action string, params map[string]any) (string, string) 
 		}
 		id := strconv.Itoa(b.nextCronID)
 		b.nextCronID++
-		b.cronjobs[id] = &Cronjob{Fields: cronFields(params, map[string]string{"is_active": "Y", "protocol": "https"})}
+		b.cronjobs[id] = &Cronjob{Fields: cronFields(params, map[string]string{"is_active": "Y", "protocol": "https", "mail_subject": "default"})}
 		return id, ""
 	case "update_cronjob":
 		j, ok := b.cronjobs[num("cronjob_id")]

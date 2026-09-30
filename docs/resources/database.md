@@ -34,7 +34,7 @@ output "shop_database" {
 
 ### Optional
 
-- `allowed_hosts` (List of String) Hosts allowed to connect from outside: IP addresses or CIDR networks. Unset keeps the database reachable from the hosting environment only.
+- `allowed_hosts` (List of String) Hosts allowed to connect from outside: IP addresses or CIDR networks. Unset keeps the database reachable from the hosting environment only; `localhost`, which KAS lists on its own, is not part of the attribute.
 
 ### Read-Only
 

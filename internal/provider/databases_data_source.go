@@ -57,7 +57,7 @@ func (d *databasesDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 						"login":         schema.StringAttribute{Computed: true, MarkdownDescription: "Database user; the same as the name."},
 						"name":          schema.StringAttribute{Computed: true, MarkdownDescription: "Database name."},
 						"comment":       schema.StringAttribute{Computed: true, MarkdownDescription: "Free text describing the database."},
-						"allowed_hosts": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: "Hosts allowed to connect from outside."},
+						"allowed_hosts": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: "Allowed hosts as KAS lists them, localhost included."},
 						"used_space":    schema.Int64Attribute{Computed: true, MarkdownDescription: "Size of the database as KAS reports it."},
 					},
 				},

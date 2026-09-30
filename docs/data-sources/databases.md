@@ -32,7 +32,7 @@ output "database_names" {
 
 Read-Only:
 
-- `allowed_hosts` (List of String) Hosts allowed to connect from outside.
+- `allowed_hosts` (List of String) Allowed hosts as KAS lists them, localhost included.
 - `comment` (String) Free text describing the database.
 - `login` (String) Database user; the same as the name.
 - `name` (String) Database name.

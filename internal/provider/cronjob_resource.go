@@ -89,9 +89,12 @@ func (m *cronjobModel) fill(j *kasapi.Cronjob) {
 	}
 	optional(&m.HTTPUser, j.HTTPUser)
 	optional(&m.MailAddress, j.MailAddress)
-	optional(&m.MailCondition, j.MailCondition)
-	if j.MailSubject != "" || !m.MailSubject.IsNull() {
-		m.MailSubject = types.StringValue(j.MailSubject)
+	// KAS fills these two itself; they are computed so the server value
+	// does not read as drift.
+	m.MailCondition = types.StringValue(j.MailCondition)
+	m.MailSubject = types.StringValue(j.MailSubject)
+	if m.MailSubject.ValueString() == "" {
+		m.MailSubject = types.StringValue("default")
 	}
 }
 
@@ -152,10 +155,14 @@ func (r *cronjobResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"mail_condition": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "No mail is sent when the output contains this word.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"mail_subject": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("default"),
 				MarkdownDescription: "`default`, or `comment` to use the comment as subject.",
 				Validators:          []validator.String{stringvalidator.OneOf("default", "comment")},
 			},
