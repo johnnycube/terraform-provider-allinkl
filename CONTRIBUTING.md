@@ -30,7 +30,7 @@ Every Go file carries the MPL-2.0 Exhibit A header; add it to new files:
 - API logic belongs in the [kasapi library](https://github.com/johnnycube/kasapi)
   (Apache-2.0); this repository is only the Terraform layer. A new use case is a
   typed service in the library plus a resource here, the matching actions in
-  `internal/provider/fake_backend_test.go`, and a lifecycle acceptance test.
+  `internal/fakekas`, and a lifecycle acceptance test.
 - `gofmt`, `go vet ./...` and `go test -race ./...` must pass. CI enforces all
   three.
 - Acceptance tests run with `TF_ACC=1 go test ./internal/provider/` and need a

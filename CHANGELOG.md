@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. Every object
+the library serves is now a resource.
+
+New:
+
+- `allinkl_domain_settings` — document root or redirect, PHP version and
+  activation of a domain that exists in the account. Never registers,
+  transfers or deletes a domain.
+- `allinkl_tls_certificate` — installs a certificate on a host and sets the
+  HTTPS redirect and HSTS. The KAS API cannot request a Let's Encrypt
+  certificate; that switch exists in the panel only.
+- `allinkl_ftp_user`, `allinkl_database`, `allinkl_cronjob`,
+  `allinkl_ddns_user`.
+- Data sources `allinkl_subdomains`, `allinkl_ftp_users`,
+  `allinkl_databases`, `allinkl_cronjobs`, `allinkl_ddns_users` and
+  `allinkl_mail_filters`.
+- `allinkl_subdomain`: `redirect_status`, `php_version`, `active` and the
+  read-only `tls` state.
+- `allinkl_mail_account`: `responder`, `state`, `allowed_clients`,
+  `webmail_autologin`, `filters` and the read-only `spam_filters`.
+- `allinkl_domains`: host settings, `dkim_selector` and `tls` per domain.
+- Provider: `otp` / `KAS_OTP` for accounts with two-factor authentication;
+  `session_lifetime` accepts up to 30000 seconds.
+
+Changed:
+
+- A subdomain created without `php_version` still gets the KAS default,
+  which the API documents as 7.1. Set one.
+- `examples/local/fakekas` and the acceptance tests share one fake KAS
+  backend, `internal/fakekas`.
+
 ## v0.2.2 (2026-09-29)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. No changes to
