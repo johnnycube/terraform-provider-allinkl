@@ -80,7 +80,10 @@ resource "allinkl_mail_forward" "sales" {
 
 A mailbox also takes `state` (`active`, `receive_disabled`, `forbidden`),
 `allowed_clients`, `webmail_autologin`, `filters` and a `responder` block for
-the autoresponder; see the resource documentation. The account `id` is the
+the autoresponder; see the resource documentation. `filters` is write-only:
+KAS reports active filters under other names than the ones it accepts, so a
+filter changed in the panel is not detected as drift. `spam_filters` shows
+what KAS reports. The account `id` is the
 KAS-assigned mail login (`m1234567`), which is also the IMAP/SMTP username. KAS has no standalone alias objects: `sender_aliases` are
 the addresses a mailbox may use in the FROM header when sending; to receive
 mail under an alias, create an `allinkl_mail_forward` pointing at the mailbox. The password is write-only: KAS never returns it, so drift
