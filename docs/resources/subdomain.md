@@ -3,20 +3,29 @@
 page_title: "allinkl_subdomain Resource - allinkl"
 subcategory: ""
 description: |-
-  Manages a subdomain at all-inkl.com (KAS).
+  Manages a subdomain at all-inkl.com (KAS): its document root or redirect, PHP version and activation.
 ---
 
 # allinkl_subdomain (Resource)
 
-Manages a subdomain at all-inkl.com (KAS).
+Manages a subdomain at all-inkl.com (KAS): its document root or redirect, PHP version and activation.
 
 ## Example Usage
 
 ```terraform
 resource "allinkl_subdomain" "blog" {
-  name   = "blog"
-  domain = "example.com"
-  path   = "/blog/"
+  name        = "blog"
+  domain      = "example.com"
+  path        = "/blog/"
+  php_version = "8.4"
+}
+
+# A subdomain that redirects: the path holds the target URL.
+resource "allinkl_subdomain" "shop" {
+  name            = "shop"
+  domain          = "example.com"
+  path            = "https://shop.example.org"
+  redirect_status = 301
 }
 ```
 
@@ -30,11 +39,26 @@ resource "allinkl_subdomain" "blog" {
 
 ### Optional
 
-- `path` (String) Document root path relative to the account root, e.g. `/blog/`.
+- `active` (Boolean) Whether the host is served. KAS creates every subdomain active; `false` is applied right after creation.
+- `path` (String) Document root path relative to the account root, e.g. `/blog/`, or the redirect target URL when `redirect_status` is set.
+- `php_version` (String) PHP version the host runs, e.g. `8.4`. Left unset, KAS chooses; the API documents 7.1 as its default.
+- `redirect_status` (Number) Redirect status: `0` (no redirect), `301`, `302` or `307`. With a redirect, `path` holds the target URL.
 
 ### Read-Only
 
 - `id` (String) Full host name (`name.domain`).
+- `tls` (Attributes) TLS state of the host, as KAS reports it. Managed with `allinkl_tls_certificate`. (see [below for nested schema](#nestedatt--tls))
+
+<a id="nestedatt--tls"></a>
+### Nested Schema for `tls`
+
+Read-Only:
+
+- `active` (Boolean) Whether the certificate is served.
+- `force_https` (Boolean) Whether HTTP requests are redirected to HTTPS.
+- `hsts_max_age` (Number) HSTS max-age in seconds; `-1` when HSTS is off.
+- `lets_encrypt` (Boolean) Whether the certificate was issued by Let's Encrypt through the KAS panel.
+- `type` (String) Certificate type as KAS names it; `LE90D` is a Let's Encrypt certificate issued through the panel.
 
 ## Import
 

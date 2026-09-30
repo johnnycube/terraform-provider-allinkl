@@ -52,7 +52,7 @@ resource "allinkl_mail_forward" "sales" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.forwardCount(); n != 0 {
+			if n := backend.Count("forwards"); n != 0 {
 				return fmt.Errorf("expected all forwards destroyed, %d left", n)
 			}
 			return nil
@@ -76,6 +76,12 @@ resource "allinkl_subdomain" "blog" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "id", "blog.example.com"),
 					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "path", "/blog/"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "redirect_status", "0"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "active", "true"),
+					// KAS chose the PHP version; the fake answers 8.4.
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "php_version", "8.4"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "tls.active", "false"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "tls.hsts_max_age", "-1"),
 				),
 			},
 			// In-place path update
@@ -88,6 +94,24 @@ resource "allinkl_subdomain" "blog" {
 }`,
 				Check: resource.TestCheckResourceAttr("allinkl_subdomain.blog", "path", "/www/blog/"),
 			},
+			// Redirect, PHP version and deactivation
+			{
+				Config: testAccProviderConfig + `
+resource "allinkl_subdomain" "blog" {
+  name            = "blog"
+  domain          = "example.com"
+  path            = "https://example.org/blog"
+  redirect_status = 301
+  php_version     = "8.3"
+  active          = false
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "path", "https://example.org/blog"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "redirect_status", "301"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "php_version", "8.3"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.blog", "active", "false"),
+				),
+			},
 			// Import by FQDN
 			{
 				ResourceName:      "allinkl_subdomain.blog",
@@ -97,10 +121,33 @@ resource "allinkl_subdomain" "blog" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.subdomainCount(); n != 0 {
+			if n := backend.Count("subdomains"); n != 0 {
 				return fmt.Errorf("expected all subdomains destroyed, %d left", n)
 			}
 			return nil
+		},
+	})
+}
+
+func TestAccSubdomain_createInactive(t *testing.T) {
+	// KAS refuses the active flag on create; the resource applies it in a
+	// second call.
+	startFakeKAS(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProviderConfig + `
+resource "allinkl_subdomain" "parked" {
+  name   = "parked"
+  domain = "example.com"
+  active = false
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("allinkl_subdomain.parked", "active", "false"),
+					resource.TestCheckResourceAttr("allinkl_subdomain.parked", "path", "/"),
+				),
+			},
 		},
 	})
 }

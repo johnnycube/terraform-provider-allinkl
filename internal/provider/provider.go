@@ -37,6 +37,7 @@ type allinklProviderModel struct {
 	Login           types.String `tfsdk:"login"`
 	Password        types.String `tfsdk:"password"`
 	AuthType        types.String `tfsdk:"auth_type"`
+	OTP             types.String `tfsdk:"otp"`
 	SessionLifetime types.Int64  `tfsdk:"session_lifetime"`
 }
 
@@ -74,11 +75,18 @@ func (p *allinklProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 					stringvalidator.OneOf(string(kasapi.AuthSHA1), string(kasapi.AuthPlain)),
 				},
 			},
+			"otp": schema.StringAttribute{
+				Optional:  true,
+				Sensitive: true,
+				MarkdownDescription: "One-time PIN for a KAS account with two-factor authentication. Can also be set via " +
+					"`KAS_OTP`. A PIN is valid for one login, so this suits a single run; an unattended " +
+					"pipeline needs an account without two-factor authentication.",
+			},
 			"session_lifetime": schema.Int64Attribute{
 				Optional:            true,
-				MarkdownDescription: "API session lifetime in seconds (max 3600, default 1800).",
+				MarkdownDescription: "API session lifetime in seconds (1-30000, default 1800).",
 				Validators: []validator.Int64{
-					int64validator.Between(0, 3600),
+					int64validator.Between(0, kasapi.MaxSessionLifetime),
 				},
 			},
 		},
@@ -117,7 +125,7 @@ func (p *allinklProvider) Configure(ctx context.Context, req provider.ConfigureR
 		}
 	}
 
-	client, err := kasapi.New(kasapi.Config{
+	cfg := kasapi.Config{
 		Login:           login,
 		Password:        password,
 		AuthType:        kasapi.AuthType(authType),
@@ -129,7 +137,13 @@ func (p *allinklProvider) Configure(ctx context.Context, req provider.ConfigureR
 		// silently redirecting credentials to a third-party host.
 		APIEndpoint:  os.Getenv("KAS_API_ENDPOINT"),
 		AuthEndpoint: os.Getenv("KAS_AUTH_ENDPOINT"),
-	})
+	}
+	if otp := firstNonEmpty(data.OTP.ValueString(), os.Getenv("KAS_OTP")); otp != "" {
+		// A PIN is single-use. It serves the first login; a later
+		// re-authentication in the same run cannot ask for a fresh one.
+		cfg.OTP = func(context.Context) (string, error) { return otp, nil }
+	}
+	client, err := kasapi.New(cfg)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to create KAS API client", err.Error())
 		return
@@ -151,10 +165,12 @@ func (p *allinklProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewMailAccountResource,
 		NewMailForwardResource,
 		NewSubdomainResource,
-		// Future use cases register here, each backed by its own kasapi
-		// service, e.g.:
-		// NewFTPUserResource,
-		// NewDatabaseResource,
+		NewDomainSettingsResource,
+		NewTLSCertificateResource,
+		NewFTPUserResource,
+		NewDatabaseResource,
+		NewCronjobResource,
+		NewDDNSUserResource,
 	}
 }
 
@@ -162,6 +178,12 @@ func (p *allinklProvider) DataSources(_ context.Context) []func() datasource.Dat
 	return []func() datasource.DataSource{
 		NewDNSRecordsDataSource,
 		NewDomainsDataSource,
+		NewSubdomainsDataSource,
+		NewFTPUsersDataSource,
+		NewDatabasesDataSource,
+		NewCronjobsDataSource,
+		NewDDNSUsersDataSource,
+		NewMailFiltersDataSource,
 	}
 }
 

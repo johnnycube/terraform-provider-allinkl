@@ -75,7 +75,7 @@ resource "allinkl_dns_record" "www" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.dnsCount(); n != 0 {
+			if n := backend.Count("dns"); n != 0 {
 				return fmt.Errorf("expected all records destroyed, %d left", n)
 			}
 			return nil

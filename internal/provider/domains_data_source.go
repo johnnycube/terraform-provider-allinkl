@@ -37,8 +37,13 @@ type domainsModel struct {
 }
 
 type domainEntryModel struct {
-	Name types.String `tfsdk:"name"`
-	Path types.String `tfsdk:"path"`
+	Name           types.String `tfsdk:"name"`
+	Path           types.String `tfsdk:"path"`
+	RedirectStatus types.Int64  `tfsdk:"redirect_status"`
+	PHPVersion     types.String `tfsdk:"php_version"`
+	Active         types.Bool   `tfsdk:"active"`
+	DKIMSelector   types.String `tfsdk:"dkim_selector"`
+	TLS            types.Object `tfsdk:"tls"`
 }
 
 func (d *domainsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -47,15 +52,20 @@ func (d *domainsDataSource) Metadata(_ context.Context, req datasource.MetadataR
 
 func (d *domainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Reads all domains hosted in the KAS account. Domain management itself is intentionally not exposed as a resource, since add/delete touch registration; use this to reference existing domains.",
+		MarkdownDescription: "Reads all domains hosted in the KAS account with their host settings. Registration and deletion are not exposed, since they touch the domain contract; `allinkl_domain_settings` changes the settings of an existing domain.",
 		Attributes: map[string]schema.Attribute{
 			"domains": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "Every domain hosted in the account.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{Computed: true, MarkdownDescription: "Domain name."},
-						"path": schema.StringAttribute{Computed: true, MarkdownDescription: "Document root path relative to the account root."},
+						"name":            schema.StringAttribute{Computed: true, MarkdownDescription: "Domain name."},
+						"path":            schema.StringAttribute{Computed: true, MarkdownDescription: "Document root path relative to the account root, or the redirect target."},
+						"redirect_status": schema.Int64Attribute{Computed: true, MarkdownDescription: descRedirect},
+						"php_version":     schema.StringAttribute{Computed: true, MarkdownDescription: "PHP version the host runs."},
+						"active":          schema.BoolAttribute{Computed: true, MarkdownDescription: descActive},
+						"dkim_selector":   schema.StringAttribute{Computed: true, MarkdownDescription: "Selector of the DKIM key KAS signs mail with."},
+						"tls":             hostTLSDataAttribute(),
 					},
 				},
 			},
@@ -92,8 +102,13 @@ func (d *domainsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	data.Domains = make([]domainEntryModel, 0, len(domains))
 	for _, dom := range domains {
 		data.Domains = append(data.Domains, domainEntryModel{
-			Name: types.StringValue(dom.Name),
-			Path: types.StringValue(dom.Path),
+			Name:           types.StringValue(dom.Name),
+			Path:           types.StringValue(dom.Path),
+			RedirectStatus: types.Int64Value(int64(dom.RedirectStatus)),
+			PHPVersion:     types.StringValue(dom.PHPVersion),
+			Active:         types.BoolValue(dom.Active),
+			DKIMSelector:   types.StringValue(dom.DKIMSelector),
+			TLS:            tlsObject(ctx, dom.TLS, &resp.Diagnostics),
 		})
 	}
 	tflog.Debug(ctx, "read domains", map[string]any{"count": len(data.Domains)})

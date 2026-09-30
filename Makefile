@@ -5,9 +5,10 @@ BINARY := terraform-provider-allinkl
 build:
 	go build -o $(BINARY)
 
-# Regenerate docs/ from the provider schema, examples/ and templates/.
+# Regenerate docs/ from the provider schema, examples/ and templates/. Uses
+# terraform when on PATH, tofu otherwise.
 generate:
-	go tool tfplugindocs generate --provider-name allinkl --rendered-provider-name allinkl
+	./scripts/generate-docs.sh
 
 test:
 	go test -race -count=1 ./...

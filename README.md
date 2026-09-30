@@ -36,6 +36,10 @@ provider "allinkl" {
 }
 ```
 
+For an account with two-factor authentication, `otp` or `KAS_OTP` supplies the
+one-time PIN. It serves one login, so it suits a single run; an unattended
+pipeline needs an account without two-factor authentication.
+
 The same configuration works with OpenTofu — the registry resolves
 `johnnycube/allinkl` for both.
 
@@ -74,8 +78,13 @@ resource "allinkl_mail_forward" "sales" {
 }
 ```
 
-The account `id` is the KAS-assigned mail login (`m1234567`), which is also the
-IMAP/SMTP username. KAS has no standalone alias objects: `sender_aliases` are
+A mailbox also takes `state` (`active`, `receive_disabled`, `forbidden`),
+`allowed_clients`, `webmail_autologin`, `filters` and a `responder` block for
+the autoresponder; see the resource documentation. `filters` is write-only:
+KAS reports active filters under other names than the ones it accepts, so a
+filter changed in the panel is not detected as drift. `spam_filters` shows
+what KAS reports. The account `id` is the
+KAS-assigned mail login (`m1234567`), which is also the IMAP/SMTP username. KAS has no standalone alias objects: `sender_aliases` are
 the addresses a mailbox may use in the FROM header when sending; to receive
 mail under an alias, create an `allinkl_mail_forward` pointing at the mailbox. The password is write-only: KAS never returns it, so drift
 on the password is not detectable and changing the value updates it. As with
@@ -86,17 +95,94 @@ Import: `terraform import allinkl_mail_account.info m1234567` and
 an account, the next apply sets the password to the configured value, because
 the API cannot read the existing one.
 
-### `allinkl_subdomain`
+### `allinkl_subdomain` and `allinkl_domain_settings`
 
 ```hcl
 resource "allinkl_subdomain" "blog" {
-  name   = "blog"
-  domain = "example.com"
-  path   = "/blog/"
+  name        = "blog"
+  domain      = "example.com"
+  path        = "/blog/"
+  php_version = "8.4"
+}
+
+resource "allinkl_subdomain" "shop" {
+  name            = "shop"
+  domain          = "example.com"
+  path            = "https://shop.example.org"   # the redirect target
+  redirect_status = 301
+}
+
+# Settings of a domain that already exists in the account.
+resource "allinkl_domain_settings" "main" {
+  domain      = "example.com"
+  php_version = "8.4"
 }
 ```
 
-Import with `terraform import allinkl_subdomain.blog blog.example.com`.
+Both carry `path`, `redirect_status`, `php_version` and `active`, and report the
+TLS state of the host as `tls`. A subdomain created without `php_version` gets
+the KAS default, which the API documents as 7.1 — set one.
+
+`allinkl_domain_settings` adopts a domain; it never registers, transfers or
+deletes one, and destroying it only forgets the domain. Import with
+`terraform import allinkl_subdomain.blog blog.example.com` and
+`terraform import allinkl_domain_settings.main example.com`.
+
+### `allinkl_tls_certificate`
+
+```hcl
+resource "allinkl_tls_certificate" "www" {
+  host         = "www.example.com"
+  certificate  = file("certs/www.example.com.crt")
+  private_key  = file("certs/www.example.com.key")
+  bundle       = file("certs/chain.pem")
+  force_https  = true
+  hsts_max_age = 31536000
+}
+```
+
+Installs a certificate you bring. The KAS API cannot request a Let's Encrypt
+certificate — that switch exists in the KAS panel only — but `tls.lets_encrypt`
+on domains and subdomains reports whether the panel issued one. A common setup
+obtains the certificate with an ACME client that solves the DNS-01 challenge
+through `allinkl_dns_record`, then installs it here. Destroying the resource
+deactivates the certificate; KAS has no call that removes one.
+
+### `allinkl_ftp_user`, `allinkl_database`, `allinkl_cronjob`, `allinkl_ddns_user`
+
+```hcl
+resource "allinkl_ftp_user" "logs" {
+  path     = "/logs/"
+  comment  = "log reader"
+  password = var.ftp_password
+  write    = false               # read, write, list and virus_scan default to true
+}
+
+resource "allinkl_database" "shop" {
+  comment       = "shop"
+  password      = var.database_password
+  allowed_hosts = ["203.0.113.7"]
+}
+
+resource "allinkl_cronjob" "nightly" {
+  comment = "nightly import"
+  url     = "example.com/cron.php"   # without the protocol; protocol defaults to https
+  minute  = "30"
+  hour    = "3"
+}
+
+resource "allinkl_ddns_user" "home" {
+  zone      = "example.com"
+  label     = "home"
+  comment   = "at home"
+  password  = var.ddns_password
+  target_ip = "203.0.113.4"          # initial address; the DDNS client moves it
+}
+```
+
+KAS assigns the logins (`f0123456`, `d0123456`, `dyn0123456`) and the cronjob
+id; each is the resource `id` and the import id. Passwords are write-only, as
+for mailboxes.
 
 ## Data sources
 
@@ -108,15 +194,20 @@ data "allinkl_dns_records" "all" {
 }
 ```
 
-`allinkl_domains` reads every domain in the account. Domain creation and
-deletion are deliberately not exposed as a resource — they touch registration
-and routing, which is not safe to automate without per-account testing. Use the
-data source to reference existing domains, or `kascli exec` from the library for
-the raw actions.
+`allinkl_domains` reads every domain in the account with its host settings and
+TLS state. Domain creation and deletion are deliberately not exposed — they
+touch registration and routing, which is not safe to automate without
+per-account testing. Use the data source to reference existing domains, or
+`kascli exec` from the library for the raw actions.
 
 ```hcl
 data "allinkl_domains" "all" {}
 ```
+
+`allinkl_subdomains`, `allinkl_ftp_users`, `allinkl_databases`,
+`allinkl_cronjobs` and `allinkl_ddns_users` list the objects of the same name.
+`allinkl_mail_filters` lists the standard filters a mailbox may use; their names
+go into `allinkl_mail_account.filters`.
 
 ## Security
 
@@ -228,23 +319,14 @@ func (s *MailingListService) Create(ctx context.Context, name, domain, password 
 Register it in the library's `New()`: `c.MailingLists = &MailingListService{c: c}`.
 
 **2. Terraform layer.** Add `internal/provider/<object>_resource.go` here,
-following `dns_record_resource.go` / `mail_account_resource.go`, register the
-constructor in `provider.go`'s `Resources()`, and add the matching actions to
-`fake_backend_test.go` plus a lifecycle acceptance test.
+following `ftp_user_resource.go` / `mail_account_resource.go`, register the
+constructor in `provider.go`'s `Resources()`, add the matching actions to
+`internal/fakekas`, and write a lifecycle acceptance test. The list data
+sources come from one template; see `subdomains_data_source.go`.
 
-kasapi serves these objects already; the provider does not expose them yet, so
-each one needs the Terraform layer only:
-
-| Object | kasapi service |
-|--------|----------------|
-| FTP users | `FTP` |
-| Databases | `Databases` |
-| Cronjobs | `Cronjobs` |
-| Dynamic DNS users | `DDNS` |
-| TLS certificate, HTTPS redirect and HSTS of a host | `TLS` |
-| PHP version, redirect and active flag of a subdomain | `Subdomains.CreateWithSettings`, `Subdomains.Update` |
-| Autoresponder, access restrictions and filters of a mailbox | `Mail` |
-| Host settings of a domain | `Domains.Update` — `add_domain` and `delete_domain` stay deliberately unexposed; see `allinkl_domains` |
+Every object kasapi serves has its resource here. Objects the library does not
+cover yet: mailing lists, directory protection, network drive users, software
+installs and symlinks.
 
 Nothing in the transport, auth or flood-protection code changes.
 

@@ -1,0 +1,1 @@
+terraform import allinkl_ddns_user.home dyn0123456

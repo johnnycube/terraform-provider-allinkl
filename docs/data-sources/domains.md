@@ -3,12 +3,12 @@
 page_title: "allinkl_domains Data Source - allinkl"
 subcategory: ""
 description: |-
-  Reads all domains hosted in the KAS account. Domain management itself is intentionally not exposed as a resource, since add/delete touch registration; use this to reference existing domains.
+  Reads all domains hosted in the KAS account with their host settings. Registration and deletion are not exposed, since they touch the domain contract; allinkl_domain_settings changes the settings of an existing domain.
 ---
 
 # allinkl_domains (Data Source)
 
-Reads all domains hosted in the KAS account. Domain management itself is intentionally not exposed as a resource, since add/delete touch registration; use this to reference existing domains.
+Reads all domains hosted in the KAS account with their host settings. Registration and deletion are not exposed, since they touch the domain contract; `allinkl_domain_settings` changes the settings of an existing domain.
 
 ## Example Usage
 
@@ -28,5 +28,21 @@ data "allinkl_domains" "all" {}
 
 Read-Only:
 
+- `active` (Boolean) Whether the host is served.
+- `dkim_selector` (String) Selector of the DKIM key KAS signs mail with.
 - `name` (String) Domain name.
-- `path` (String) Document root path relative to the account root.
+- `path` (String) Document root path relative to the account root, or the redirect target.
+- `php_version` (String) PHP version the host runs.
+- `redirect_status` (Number) Redirect status: `0` (no redirect), `301`, `302` or `307`. With a redirect, `path` holds the target URL.
+- `tls` (Attributes) TLS state of the host, as KAS reports it. (see [below for nested schema](#nestedatt--domains--tls))
+
+<a id="nestedatt--domains--tls"></a>
+### Nested Schema for `domains.tls`
+
+Read-Only:
+
+- `active` (Boolean) Whether the certificate is served.
+- `force_https` (Boolean) Whether HTTP requests are redirected to HTTPS.
+- `hsts_max_age` (Number) HSTS max-age in seconds; `-1` when HSTS is off.
+- `lets_encrypt` (Boolean) Whether the certificate was issued by Let's Encrypt through the KAS panel.
+- `type` (String) Certificate type as KAS names it; `LE90D` is a Let's Encrypt certificate issued through the panel.
