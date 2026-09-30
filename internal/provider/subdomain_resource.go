@@ -14,9 +14,11 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -42,10 +44,29 @@ type subdomainResource struct {
 }
 
 type subdomainModel struct {
-	ID     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Domain types.String `tfsdk:"domain"`
-	Path   types.String `tfsdk:"path"`
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Domain         types.String `tfsdk:"domain"`
+	Path           types.String `tfsdk:"path"`
+	RedirectStatus types.Int64  `tfsdk:"redirect_status"`
+	PHPVersion     types.String `tfsdk:"php_version"`
+	Active         types.Bool   `tfsdk:"active"`
+	TLS            types.Object `tfsdk:"tls"`
+}
+
+func (m subdomainModel) settings() hostSettingsModel {
+	return hostSettingsModel{Path: m.Path, RedirectStatus: m.RedirectStatus, PHPVersion: m.PHPVersion, Active: m.Active}
+}
+
+// fill copies the state KAS reports into the model.
+func (m *subdomainModel) fill(ctx context.Context, sub *kasapi.Subdomain, diags *diag.Diagnostics) {
+	if sub.Path != "" {
+		m.Path = types.StringValue(sub.Path)
+	}
+	m.RedirectStatus = types.Int64Value(int64(sub.RedirectStatus))
+	m.PHPVersion = types.StringValue(sub.PHPVersion)
+	m.Active = types.BoolValue(sub.Active)
+	m.TLS = tlsObject(ctx, sub.TLS, diags)
 }
 
 func (r *subdomainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -53,43 +74,53 @@ func (r *subdomainResource) Metadata(_ context.Context, req resource.MetadataReq
 }
 
 func (r *subdomainResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a subdomain at all-inkl.com (KAS).",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Full host name (`name.domain`).",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "Subdomain label, e.g. `blog`. Changing it forces a new subdomain.",
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"domain": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "Parent domain hosted in the KAS account. Changing it forces a new subdomain.",
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(3),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"path": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("/"),
-				MarkdownDescription: "Document root path relative to the account root, e.g. `/blog/`.",
+	attrs := hostSettingsAttributes()
+	attrs["active"] = schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+		MarkdownDescription: descActive + " KAS creates every subdomain active; `false` is applied right after creation.",
+	}
+	for k, v := range map[string]schema.Attribute{
+		"id": schema.StringAttribute{
+			Computed:            true,
+			MarkdownDescription: "Full host name (`name.domain`).",
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
 			},
 		},
+		"name": schema.StringAttribute{
+			Required:            true,
+			MarkdownDescription: "Subdomain label, e.g. `blog`. Changing it forces a new subdomain.",
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(1),
+			},
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
+		},
+		"domain": schema.StringAttribute{
+			Required:            true,
+			MarkdownDescription: "Parent domain hosted in the KAS account. Changing it forces a new subdomain.",
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(3),
+			},
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
+		},
+		"path": schema.StringAttribute{
+			Optional:            true,
+			Computed:            true,
+			Default:             stringdefault.StaticString("/"),
+			MarkdownDescription: "Document root path relative to the account root, e.g. `/blog/`, or the redirect target URL when `redirect_status` is set.",
+		},
+	} {
+		attrs[k] = v
+	}
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages a subdomain at all-inkl.com (KAS): its document root or redirect, PHP version and activation.",
+		Attributes:          attrs,
 	}
 }
 
@@ -113,15 +144,30 @@ func (r *subdomainResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	err := r.client.Subdomains.Create(ctx,
-		plan.Name.ValueString(), plan.Domain.ValueString(), plan.Path.ValueString())
+	hs := plan.settings().changes(nil)
+	hs.Active = nil
+	err := r.client.Subdomains.CreateWithSettings(ctx, plan.Name.ValueString(), plan.Domain.ValueString(), hs)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create subdomain", err.Error())
 		return
 	}
-
 	plan.ID = types.StringValue(plan.Name.ValueString() + "." + plan.Domain.ValueString())
 	tflog.Debug(ctx, "created subdomain", map[string]any{"id": plan.ID.ValueString()})
+
+	if !plan.Active.ValueBool() {
+		off := false
+		if err := r.client.Subdomains.Update(ctx, plan.ID.ValueString(), kasapi.HostSettings{Active: &off}); err != nil {
+			resp.Diagnostics.AddError("Failed to deactivate subdomain", err.Error())
+			return
+		}
+	}
+
+	sub, err := r.client.Subdomains.Get(ctx, plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read subdomain after creation", err.Error())
+		return
+	}
+	plan.fill(ctx, sub, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -144,9 +190,7 @@ func (r *subdomainResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	if sub.Path != "" {
-		state.Path = types.StringValue(sub.Path)
-	}
+	state.fill(ctx, sub, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -158,15 +202,22 @@ func (r *subdomainResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	if !plan.Path.Equal(state.Path) {
-		if err := r.client.Subdomains.UpdatePath(ctx, state.ID.ValueString(), plan.Path.ValueString()); err != nil {
-			resp.Diagnostics.AddError("Failed to update subdomain path", err.Error())
+	current := state.settings()
+	if hs := plan.settings().changes(&current); !hostSettingsEmpty(hs) {
+		if err := r.client.Subdomains.Update(ctx, state.ID.ValueString(), hs); err != nil {
+			resp.Diagnostics.AddError("Failed to update subdomain", err.Error())
 			return
 		}
 	}
 
 	plan.ID = state.ID
 	tflog.Debug(ctx, "updated subdomain", map[string]any{"id": plan.ID.ValueString()})
+	sub, err := r.client.Subdomains.Get(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read subdomain after update", err.Error())
+		return
+	}
+	plan.fill(ctx, sub, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

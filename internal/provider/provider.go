@@ -165,10 +165,7 @@ func (p *allinklProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewMailAccountResource,
 		NewMailForwardResource,
 		NewSubdomainResource,
-		// Future use cases register here, each backed by its own kasapi
-		// service, e.g.:
-		// NewFTPUserResource,
-		// NewDatabaseResource,
+		NewDomainSettingsResource,
 	}
 }
 
