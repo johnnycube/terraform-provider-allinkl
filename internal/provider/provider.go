@@ -167,6 +167,7 @@ func (p *allinklProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewSubdomainResource,
 		NewDomainSettingsResource,
 		NewTLSCertificateResource,
+		NewFTPUserResource,
 	}
 }
 
