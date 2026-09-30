@@ -15,8 +15,8 @@ import (
 
 func TestAccDNSRecordsDataSource(t *testing.T) {
 	backend := startFakeKAS(t)
-	backend.seedDNSRecord("www", "A", "203.0.113.10", "0")
-	backend.seedDNSRecord("", "MX", "mail.example.com.", "10")
+	backend.SeedDNSRecord("www", "A", "203.0.113.10", "0")
+	backend.SeedDNSRecord("", "MX", "mail.example.com.", "10")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -41,8 +41,8 @@ data "allinkl_dns_records" "all" {
 
 func TestAccDomainsDataSource(t *testing.T) {
 	backend := startFakeKAS(t)
-	backend.seedDomain("example.com", "/web/")
-	backend.seedDomain("example.org", "/org/")
+	backend.SeedDomain("example.com", "/web/")
+	backend.SeedDomain("example.org", "/org/")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

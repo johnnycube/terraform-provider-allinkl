@@ -37,7 +37,7 @@ resource "allinkl_mail_account" "info" {
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "copy_addresses.#", "1"),
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "sender_aliases.0", "contact@example.com"),
 					func(_ *terraform.State) error {
-						if got := backend.passwordOf(backend.firstAccountLogin()); got != "first-Passw0rd" {
+						if got := backend.PasswordOf(backend.FirstAccountLogin()); got != "first-Passw0rd" {
 							return fmt.Errorf("API received password %q", got)
 						}
 						return nil
@@ -58,10 +58,10 @@ resource "allinkl_mail_account" "info" {
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "copy_addresses.#", "2"),
 					resource.TestCheckResourceAttr("allinkl_mail_account.info", "sender_aliases.#", "2"),
 					func(_ *terraform.State) error {
-						if backend.accountCount() != 1 {
-							return fmt.Errorf("expected in-place update, got %d accounts", backend.accountCount())
+						if backend.Count("accounts") != 1 {
+							return fmt.Errorf("expected in-place update, got %d accounts", backend.Count("accounts"))
 						}
-						if got := backend.passwordOf(backend.firstAccountLogin()); got != "second-Passw0rd" {
+						if got := backend.PasswordOf(backend.FirstAccountLogin()); got != "second-Passw0rd" {
 							return fmt.Errorf("API did not receive new password, has %q", got)
 						}
 						return nil
@@ -77,7 +77,7 @@ resource "allinkl_mail_account" "info" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.accountCount(); n != 0 {
+			if n := backend.Count("accounts"); n != 0 {
 				return fmt.Errorf("expected all accounts destroyed, %d left", n)
 			}
 			return nil

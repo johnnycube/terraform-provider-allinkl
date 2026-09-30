@@ -52,7 +52,7 @@ resource "allinkl_mail_forward" "sales" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.forwardCount(); n != 0 {
+			if n := backend.Count("forwards"); n != 0 {
 				return fmt.Errorf("expected all forwards destroyed, %d left", n)
 			}
 			return nil
@@ -97,7 +97,7 @@ resource "allinkl_subdomain" "blog" {
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
-			if n := backend.subdomainCount(); n != 0 {
+			if n := backend.Count("subdomains"); n != 0 {
 				return fmt.Errorf("expected all subdomains destroyed, %d left", n)
 			}
 			return nil

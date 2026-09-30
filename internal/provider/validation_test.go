@@ -78,7 +78,7 @@ resource "allinkl_mail_forward" "sales" {
 
 func TestAccMailAccount_alreadyExists(t *testing.T) {
 	backend := startFakeKAS(t)
-	backend.seedMailAccount("info", "example.com")
+	backend.SeedMailAccount("info", "example.com")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

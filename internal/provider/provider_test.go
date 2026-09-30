@@ -16,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/johnnycube/kasapi/kasapitest"
+
+	"github.com/johnnycube/terraform-provider-allinkl/internal/fakekas"
 )
 
 // Acceptance tests run a real terraform/tofu binary against this provider,
@@ -62,10 +64,10 @@ provider "allinkl" {
 
 // startFakeKAS starts the fake server with a fresh in-memory backend and
 // points the provider at it for the duration of the test via env vars.
-func startFakeKAS(t *testing.T) *fakeBackend {
+func startFakeKAS(t *testing.T) *fakekas.Backend {
 	t.Helper()
-	b := newFakeBackend()
-	srv := kasapitest.New(t, b.handle)
+	b := fakekas.New()
+	srv := kasapitest.New(t, b.Handle)
 	t.Setenv("KAS_API_ENDPOINT", srv.APIURL())
 	t.Setenv("KAS_AUTH_ENDPOINT", srv.AuthURL())
 	return b
