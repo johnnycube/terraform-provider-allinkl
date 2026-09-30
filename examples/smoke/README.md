@@ -16,6 +16,7 @@ rest; that is a finding, not damage.
 ```sh
 cd examples/smoke
 export KAS_LOGIN=w0123456 KAS_PASSWORD=...   # KAS_OTP for a 2FA account
+export KAS_AUTH_TYPE=plain                    # if KAS answers kas_auth_type_disabled to the sha1 default
 ./run.sh example.com                          # phase 1: plan and apply data sources only
 ./run.sh example.com write                    # phase 2: plan, ask, apply, ask, destroy
 ```
