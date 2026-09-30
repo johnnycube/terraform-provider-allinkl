@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 (2026-09-30)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. Every object
 the library serves is now a resource.
