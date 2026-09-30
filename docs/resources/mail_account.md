@@ -22,6 +22,25 @@ resource "allinkl_mail_account" "info" {
   # Addresses this mailbox may send from. Receiving under an alias
   # is a separate allinkl_mail_forward.
   sender_aliases = ["contact@example.com"]
+
+  # Standard filters: names from data.allinkl_mail_filters, content
+  # filters with an action.
+  filters = ["rspamd", "spamc_move:move=Junk"]
+}
+
+# A mailbox that only the office network and webmail may access, with an
+# out-of-office reply for a fixed window.
+resource "allinkl_mail_account" "office" {
+  local_part      = "office"
+  domain          = "example.com"
+  password        = var.office_password
+  allowed_clients = ["203.0.113.0/24", "webmail"]
+
+  responder = {
+    text  = "The office is closed until 4 January."
+    start = "2026-12-24T00:00:00+01:00"
+    end   = "2027-01-04T00:00:00+01:00"
+  }
 }
 ```
 
@@ -36,13 +55,33 @@ resource "allinkl_mail_account" "info" {
 
 ### Optional
 
+- `allowed_clients` (List of String) Clients allowed to access the mailbox: IP addresses, CIDR networks or `webmail`. Unset means unrestricted.
 - `copy_addresses` (List of String) Addresses that receive a copy of every incoming mail.
+- `filters` (List of String) Standard filters, each `name` or `name:action` (`delete`, `mark`, `move=<folder>`, `forward=<address>`; actions apply to content filters). `allinkl_mail_filters` lists the names. Write-only: KAS reports active filters under other names, see `spam_filters`, so a change at KAS is not detected.
+- `responder` (Attributes) Autoresponder. Present turns it on; absent turns it off. (see [below for nested schema](#nestedatt--responder))
 - `sender_aliases` (List of String) Addresses the mailbox may use in the FROM header when sending. Aliases only affect sending; to receive mail under an alias, create an `allinkl_mail_forward` pointing at this mailbox instead.
+- `state` (String) `active` (default), `receive_disabled` (rejects new mail, stored mail stays retrievable) or `forbidden` (rejects mail and blocks retrieval).
+- `webmail_autologin` (Boolean) Whether the KAS panel may open webmail without the mailbox password.
 
 ### Read-Only
 
 - `address` (String) Full primary address (`local_part@domain`).
 - `id` (String) KAS-assigned mail login, e.g. `m1234567`.
+- `spam_filters` (List of String) Filters active on the mailbox, as KAS names them.
+
+<a id="nestedatt--responder"></a>
+### Nested Schema for `responder`
+
+Required:
+
+- `text` (String) Reply text.
+
+Optional:
+
+- `content_type` (String) `text` (default) or `html`.
+- `display_name` (String) Sender name shown on the reply.
+- `end` (String) End of the responder window, RFC 3339.
+- `start` (String) Start of the responder window, RFC 3339. Set `start` and `end` together.
 
 ## Import
 
