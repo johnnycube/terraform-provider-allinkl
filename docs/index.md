@@ -34,5 +34,6 @@ calls and honors the announced delays, so large plans apply slowly by design.
 
 - `auth_type` (String) How credentials are sent when creating the API session: `sha1` (default) or `plain`. Can also be set via `KAS_AUTH_TYPE`.
 - `login` (String) KAS login (e.g. `w0123456`). Can also be set via the `KAS_LOGIN` environment variable.
+- `otp` (String, Sensitive) One-time PIN for a KAS account with two-factor authentication. Can also be set via `KAS_OTP`. A PIN is valid for one login, so this suits a single run; an unattended pipeline needs an account without two-factor authentication.
 - `password` (String, Sensitive) KAS account or API password. Can also be set via the `KAS_PASSWORD` environment variable.
-- `session_lifetime` (Number) API session lifetime in seconds (max 3600, default 1800).
+- `session_lifetime` (Number) API session lifetime in seconds (1-30000, default 1800).
