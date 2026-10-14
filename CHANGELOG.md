@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.1 (2026-10-14)
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.2. No changes to
+the schemas of resources or data sources.
+
+Security:
+
+- Built with Go 1.26.9, which fixes vulnerabilities in net/http,
+  net/textproto, crypto/tls and html/template of Go 1.26.8.
+- golang.org/x/net v0.60.0, golang.org/x/crypto v0.57.0,
+  golang.org/x/mod v0.41.0 and github.com/yuin/goldmark v1.7.17 fix the
+  vulnerabilities govulncheck reports for the previous versions.
+
 ## v0.3.0 (2026-09-30)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.1. Every object
