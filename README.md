@@ -278,9 +278,16 @@ changes.
 ## Testing
 
 ```sh
+make tools     # pinned golangci-lint, govulncheck and go-licenses
 make test      # unit tests
 make testacc   # acceptance tests: a real terraform/tofu binary against the fake KAS server
+make check     # lint, tests, coverage floor, audit, build and fleetlint — what CI runs
+prek install   # git hooks from .pre-commit-config.yaml; pre-push runs make check
 ```
+
+`make check` also needs `gitleaks`, `fleetlint` and a tofu or terraform binary
+on `PATH`. [ARCHITECTURE.md](ARCHITECTURE.md) describes how the provider, kasapi
+and the fake KAS fit together.
 
 Acceptance tests run a Terraform or OpenTofu binary through full
 create/update/replace/import/destroy lifecycles. They point the provider at the

@@ -31,11 +31,13 @@ Every Go file carries the MPL-2.0 Exhibit A header; add it to new files:
   (Apache-2.0); this repository is only the Terraform layer. A new use case is a
   typed service in the library plus a resource here, the matching actions in
   `internal/fakekas`, and a lifecycle acceptance test.
-- `gofmt`, `go vet ./...` and `go test -race ./...` must pass. CI enforces all
-  three.
-- Acceptance tests run with `TF_ACC=1 go test ./internal/provider/` and need a
-  `terraform` or `tofu` binary (`TF_ACC_TERRAFORM_PATH=tofu`), but no real KAS
-  credentials — they use the in-process fake server.
+- `make check` must pass: lint, unit tests, coverage of at least 75% over unit
+  and acceptance tests, audit (govulncheck, licenses, `go mod tidy`, gitleaks),
+  build and fleetlint. CI runs the same target; `make tools` installs the pinned
+  linters, and `prek install` runs it before every push.
+- Acceptance tests (`make testacc`) need a `terraform` or `tofu` binary but no
+  real KAS credentials — they use the in-process fake server.
+- Commit messages follow Conventional Commits; the commit-msg hook checks them.
 
 ## Prose
 
