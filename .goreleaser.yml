@@ -1,6 +1,6 @@
 # Release configuration producing the asset layout both the OpenTofu Registry
 # and the Terraform Registry expect: per-platform zips, a SHA256SUMS file and
-# a detached GPG signature of it.
+# a detached GPG signature of it. Each zip also gets an SPDX SBOM (syft).
 #
 # Release with:  GPG_FINGERPRINT=<fpr> goreleaser release --clean
 version: 2
@@ -31,11 +31,20 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
+  # The registries read SHA256SUMS: zips and the manifest only, no SBOMs.
+  ids: [default]
   extra_files:
     - glob: "terraform-registry-manifest.json"
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
+
+sboms:
+  - id: sbom
+    artifacts: archive
+    documents: ["{{ .ArtifactName }}.spdx.json"]
+    cmd: syft
+    args: ["$artifact", "--output", "spdx-json=$document"]
 
 signs:
   - artifacts: checksum

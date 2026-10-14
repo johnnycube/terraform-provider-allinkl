@@ -17,3 +17,5 @@ gpg-fingerprint.txt
 
 # make cover output
 coverage/
+# goreleaser output
+dist/
