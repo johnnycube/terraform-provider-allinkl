@@ -12,13 +12,16 @@ WRITE="${2:-}"
 : "${KAS_LOGIN:?set KAS_LOGIN}"
 : "${KAS_PASSWORD:?set KAS_PASSWORD}"
 TOFU="$(command -v tofu || command -v terraform || true)"
-[ -n "$TOFU" ] || { echo "need 'tofu' or 'terraform' on PATH" >&2; exit 1; }
+[ -n "$TOFU" ] || {
+  echo "need 'tofu' or 'terraform' on PATH" >&2
+  exit 1
+}
 
 mkdir -p "$BIN_DIR"
 echo "==> Building provider from $REPO_ROOT"
-( cd "$REPO_ROOT" && GOWORK=off go build -o "$BIN_DIR/terraform-provider-allinkl" . )
+(cd "$REPO_ROOT" && GOWORK=off go build -o "$BIN_DIR/terraform-provider-allinkl" .)
 
-cat > "$RUN_DIR/dev.tofurc" <<CFG
+cat >"$RUN_DIR/dev.tofurc" <<CFG
 provider_installation {
   dev_overrides {
     "registry.terraform.io/johnnycube/allinkl" = "$BIN_DIR"
