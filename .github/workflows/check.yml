@@ -1,0 +1,108 @@
+# Actions are pinned to commit SHAs; Renovate keeps the pins and the
+# `# renovate:` version comments current.
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"   # weekly: catches new vulnerabilities in unchanged code
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # `make check`: lint, unit tests, coverage over unit + acceptance tests, audit, build, fleetlint.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0          # gitleaks scans the history
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2
+        with:
+          tofu_wrapper: false
+      - name: Go tools
+        run: |
+          make tools
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: gitleaks, pinned and checksum-verified
+        env:
+          # renovate: datasource=github-releases depName=gitleaks/gitleaks
+          GITLEAKS_VERSION: v8.30.1
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          v=${GITLEAKS_VERSION#v}
+          base="https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}"
+          curl -sSfLO "${base}/gitleaks_${v}_linux_x64.tar.gz"
+          curl -sSfL "${base}/gitleaks_${v}_checksums.txt" | grep " gitleaks_${v}_linux_x64.tar.gz$" | sha256sum -c -
+          tar -xzf "gitleaks_${v}_linux_x64.tar.gz" -C "$HOME/.local/bin" gitleaks
+          rm "gitleaks_${v}_linux_x64.tar.gz"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: fleetlint (the check target runs it)
+        env:
+          # renovate: datasource=go depName=github.com/fleetlint/fleetlint
+          FLEETLINT_VERSION: v0.4.0
+        run: go install "github.com/fleetlint/fleetlint/cmd/fleetlint@${FLEETLINT_VERSION}"
+      - run: make check
+
+  # Acceptance tests run a real Terraform/OpenTofu binary against the provider,
+  # which talks to an in-process fake KAS server - no credentials required. The
+  # matrix exercises both CLIs and a min/latest spread to catch protocol drift.
+  acceptance:
+    name: acceptance (${{ matrix.tool }} ${{ matrix.version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tool: opentofu, version: latest }
+          - { tool: opentofu, version: "1.8.0" }
+          - { tool: terraform, version: latest }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - if: matrix.tool == 'opentofu'
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2
+        with:
+          tofu_version: ${{ matrix.version }}
+          tofu_wrapper: false
+      - if: matrix.tool == 'terraform'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: ${{ matrix.version }}
+          terraform_wrapper: false
+      # The Makefile picks tofu, else terraform, and the matching registry host.
+      - run: make testacc
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_wrapper: false
+      - run: make docs-check

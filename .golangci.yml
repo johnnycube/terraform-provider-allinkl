@@ -7,6 +7,9 @@ linters:
     - unconvert
     - unparam
     - gosec
+    - errorlint
+    - gocognit
+    - funlen
   settings:
     misspell:
       # "adress" is the spelling KAS uses for its mail address fields
@@ -21,3 +24,14 @@ linters:
         # under our control.
         - G401
         - G505
+  exclusions:
+    rules:
+      # Acceptance tests are declarative step lists; splitting them hides the lifecycle.
+      - path: _test\.go
+        linters: [funlen]
+      # Schema methods are one declarative attribute literal.
+      - linters: [funlen]
+        source: '^func \([a-z]+ \*[A-Za-z]+\) Schema\('
+
+formatters:
+  enable: [gofmt]

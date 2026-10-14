@@ -1,0 +1,8 @@
+# Default rules plus an allowlist for the fake passwords of examples/local,
+# which runs against the in-process fake KAS.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "fake credentials of the local example"
+regexes = ['''^"fake-[a-z]+-pw"$''']

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.2 (2026-10-14)
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.3. No changes to
+the schemas of resources or data sources.
+
+Release:
+
+- Each release archive has an SPDX SBOM (`*.spdx.json`), and GitHub stores a
+  SLSA build provenance attestation for every archive
+  (`gh attestation verify <zip> -R johnnycube/terraform-provider-allinkl`).
+  `SHA256SUMS` lists the provider archives and the manifest only, and stays
+  GPG-signed for the registries.
+
 ## v0.3.1 (2026-10-14)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.2. No changes to

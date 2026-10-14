@@ -346,22 +346,8 @@ func (r *mailAccountResource) Create(ctx context.Context, req resource.CreateReq
 
 	address := plan.LocalPart.ValueString() + "@" + plan.Domain.ValueString()
 
-	// Terraform only knows about objects in its state, so a mailbox that already
-	// exists at KAS but is unmanaged would fail at create with a raw fault.
-	// Detect that case and point the user at import instead. Best-effort: if the
-	// lookup fails we fall through and let Create surface the real error.
-	if existing, err := r.client.Mail.ListAccounts(ctx); err == nil {
-		for _, acc := range existing {
-			if acc.Address() == address {
-				resp.Diagnostics.AddError(
-					"Mail account already exists",
-					fmt.Sprintf("A mailbox for %s already exists at KAS (login %s). Import it "+
-						"instead of creating it:\n\n  terraform import allinkl_mail_account.<name> %s",
-						address, acc.Login, acc.Login),
-				)
-				return
-			}
-		}
+	if r.existsUnmanaged(ctx, address, &resp.Diagnostics) {
+		return
 	}
 
 	clients := listToStrings(ctx, plan.AllowedClients, &resp.Diagnostics)
@@ -387,31 +373,59 @@ func (r *mailAccountResource) Create(ctx context.Context, req resource.CreateReq
 	plan.Address = types.StringValue(address)
 	tflog.Debug(ctx, "created mail account", map[string]any{"id": login, "address": address})
 
-	// KAS creates every mailbox active with webmail autologin on and no
-	// filters; the rest is applied afterwards.
-	if state := plan.State.ValueString(); state != "active" {
-		if err := r.client.Mail.UpdateState(ctx, login, mailStates[state]); err != nil {
-			resp.Diagnostics.AddError("Failed to set mailbox state", err.Error())
-			return
-		}
-	}
-	if !plan.WebmailAutologin.ValueBool() {
-		if err := r.client.Mail.UpdateWebmailAutologin(ctx, login, false); err != nil {
-			resp.Diagnostics.AddError("Failed to set webmail autologin", err.Error())
-			return
-		}
-	}
-	if filters := listToStrings(ctx, plan.Filters, &resp.Diagnostics); len(filters) > 0 {
-		if err := r.client.Mail.SetFilters(ctx, login, filtersFrom(filters)); err != nil {
-			resp.Diagnostics.AddError("Failed to set mail filters", err.Error())
-			return
-		}
+	r.applyAfterCreate(ctx, login, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	r.refresh(ctx, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// existsUnmanaged reports a mailbox that exists at KAS but not in the state,
+// pointing at import instead of failing with a raw fault. Best-effort: a
+// failed lookup returns false and lets Create surface the real error.
+func (r *mailAccountResource) existsUnmanaged(ctx context.Context, address string, diags *diag.Diagnostics) bool {
+	existing, err := r.client.Mail.ListAccounts(ctx)
+	if err != nil {
+		return false
+	}
+	for _, acc := range existing {
+		if acc.Address() == address {
+			diags.AddError(
+				"Mail account already exists",
+				fmt.Sprintf("A mailbox for %s already exists at KAS (login %s). Import it "+
+					"instead of creating it:\n\n  terraform import allinkl_mail_account.<name> %s",
+					address, acc.Login, acc.Login),
+			)
+			return true
+		}
+	}
+	return false
+}
+
+// applyAfterCreate sets what add_mailaccount cannot: KAS creates every mailbox
+// active with webmail autologin on and no filters.
+func (r *mailAccountResource) applyAfterCreate(ctx context.Context, login string, plan *mailAccountModel, diags *diag.Diagnostics) {
+	if state := plan.State.ValueString(); state != "active" {
+		if err := r.client.Mail.UpdateState(ctx, login, mailStates[state]); err != nil {
+			diags.AddError("Failed to set mailbox state", err.Error())
+			return
+		}
+	}
+	if !plan.WebmailAutologin.ValueBool() {
+		if err := r.client.Mail.UpdateWebmailAutologin(ctx, login, false); err != nil {
+			diags.AddError("Failed to set webmail autologin", err.Error())
+			return
+		}
+	}
+	if filters := listToStrings(ctx, plan.Filters, diags); len(filters) > 0 {
+		if err := r.client.Mail.SetFilters(ctx, login, filtersFrom(filters)); err != nil {
+			diags.AddError("Failed to set mail filters", err.Error())
+		}
+	}
 }
 
 // refresh reads the mailbox from KAS into the model.
@@ -477,86 +491,14 @@ func (r *mailAccountResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	login := state.ID.ValueString()
-
-	if !plan.Password.Equal(state.Password) {
-		if err := r.client.Mail.UpdatePassword(ctx, login, plan.Password.ValueString()); err != nil {
-			resp.Diagnostics.AddError("Failed to update mailbox password", err.Error())
-			return
+	for _, u := range r.updates(ctx, state.ID.ValueString(), &plan, &state, &resp.Diagnostics) {
+		if !u.changed {
+			continue
 		}
-	}
-
-	if !plan.CopyAddresses.Equal(state.CopyAddresses) {
-		copies := listToStrings(ctx, plan.CopyAddresses, &resp.Diagnostics)
+		if err := u.apply(); err != nil {
+			resp.Diagnostics.AddError(u.summary, err.Error())
+		}
 		if resp.Diagnostics.HasError() {
-			return
-		}
-		if err := r.client.Mail.UpdateCopyAddresses(ctx, login, copies); err != nil {
-			resp.Diagnostics.AddError("Failed to update copy addresses", err.Error())
-			return
-		}
-	}
-
-	if !plan.SenderAliases.Equal(state.SenderAliases) {
-		aliases := listToStrings(ctx, plan.SenderAliases, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		if err := r.client.Mail.UpdateSenderAliases(ctx, login, aliases); err != nil {
-			resp.Diagnostics.AddError("Failed to update sender aliases", err.Error())
-			return
-		}
-	}
-
-	if !plan.AllowedClients.Equal(state.AllowedClients) {
-		clients := listToStrings(ctx, plan.AllowedClients, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		if err := r.client.Mail.UpdateAllowNets(ctx, login, clients); err != nil {
-			resp.Diagnostics.AddError("Failed to update allowed clients", err.Error())
-			return
-		}
-	}
-
-	if !plan.State.Equal(state.State) {
-		if err := r.client.Mail.UpdateState(ctx, login, mailStates[plan.State.ValueString()]); err != nil {
-			resp.Diagnostics.AddError("Failed to update mailbox state", err.Error())
-			return
-		}
-	}
-
-	if !plan.WebmailAutologin.Equal(state.WebmailAutologin) {
-		if err := r.client.Mail.UpdateWebmailAutologin(ctx, login, plan.WebmailAutologin.ValueBool()); err != nil {
-			resp.Diagnostics.AddError("Failed to update webmail autologin", err.Error())
-			return
-		}
-	}
-
-	if !plan.Responder.Equal(state.Responder) {
-		responder := responderFromObject(ctx, plan.Responder, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		if err := r.client.Mail.UpdateResponder(ctx, login, responder); err != nil {
-			resp.Diagnostics.AddError("Failed to update responder", err.Error())
-			return
-		}
-	}
-
-	if !plan.Filters.Equal(state.Filters) {
-		filters := listToStrings(ctx, plan.Filters, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		var err error
-		if len(filters) == 0 {
-			err = r.client.Mail.DeleteFilters(ctx, login)
-		} else {
-			err = r.client.Mail.SetFilters(ctx, login, filtersFrom(filters))
-		}
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update mail filters", err.Error())
 			return
 		}
 	}
@@ -567,6 +509,61 @@ func (r *mailAccountResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// mailUpdate is one KAS call of an update, made when its attribute changed.
+type mailUpdate struct {
+	changed bool
+	summary string
+	apply   func() error
+}
+
+// updates lists the KAS calls that move a mailbox from state to plan, in order.
+func (r *mailAccountResource) updates(ctx context.Context, login string, plan, state *mailAccountModel, diags *diag.Diagnostics) []mailUpdate {
+	mail := r.client.Mail
+	// list converts a list attribute first; a conversion error lands in diags.
+	list := func(l types.List, call func([]string) error) func() error {
+		return func() error {
+			v := listToStrings(ctx, l, diags)
+			if diags.HasError() {
+				return nil
+			}
+			return call(v)
+		}
+	}
+	return []mailUpdate{
+		{!plan.Password.Equal(state.Password), "Failed to update mailbox password", func() error {
+			return mail.UpdatePassword(ctx, login, plan.Password.ValueString())
+		}},
+		{!plan.CopyAddresses.Equal(state.CopyAddresses), "Failed to update copy addresses", list(plan.CopyAddresses, func(v []string) error {
+			return mail.UpdateCopyAddresses(ctx, login, v)
+		})},
+		{!plan.SenderAliases.Equal(state.SenderAliases), "Failed to update sender aliases", list(plan.SenderAliases, func(v []string) error {
+			return mail.UpdateSenderAliases(ctx, login, v)
+		})},
+		{!plan.AllowedClients.Equal(state.AllowedClients), "Failed to update allowed clients", list(plan.AllowedClients, func(v []string) error {
+			return mail.UpdateAllowNets(ctx, login, v)
+		})},
+		{!plan.State.Equal(state.State), "Failed to update mailbox state", func() error {
+			return mail.UpdateState(ctx, login, mailStates[plan.State.ValueString()])
+		}},
+		{!plan.WebmailAutologin.Equal(state.WebmailAutologin), "Failed to update webmail autologin", func() error {
+			return mail.UpdateWebmailAutologin(ctx, login, plan.WebmailAutologin.ValueBool())
+		}},
+		{!plan.Responder.Equal(state.Responder), "Failed to update responder", func() error {
+			responder := responderFromObject(ctx, plan.Responder, diags)
+			if diags.HasError() {
+				return nil
+			}
+			return mail.UpdateResponder(ctx, login, responder)
+		}},
+		{!plan.Filters.Equal(state.Filters), "Failed to update mail filters", list(plan.Filters, func(v []string) error {
+			if len(v) == 0 {
+				return mail.DeleteFilters(ctx, login)
+			}
+			return mail.SetFilters(ctx, login, filtersFrom(v))
+		})},
+	}
 }
 
 func (r *mailAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
