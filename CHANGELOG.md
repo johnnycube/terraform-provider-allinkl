@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.3 (2026-10-21)
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.4. No changes to
+the schemas of resources or data sources.
+
+Security:
+
+- Built with Go 1.27.3, which distrusts compromised intermediate certificates
+  in crypto/x509 (GO-2026-6809, CVE-2026-111943). `go.mod` sets `go 1.27.3`.
+
 ## v0.3.2 (2026-10-14)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.3. No changes to
