@@ -65,7 +65,7 @@ func (m cronjobModel) job() kasapi.Cronjob {
 		ID: m.ID.ValueString(), Comment: m.Comment.ValueString(), Protocol: m.Protocol.ValueString(), URL: m.URL.ValueString(),
 		Minute: m.Minute.ValueString(), Hour: m.Hour.ValueString(), DayOfMonth: m.DayOfMonth.ValueString(),
 		Month: m.Month.ValueString(), DayOfWeek: m.DayOfWeek.ValueString(),
-		HTTPUser: m.HTTPUser.ValueString(), HTTPPassword: m.HTTPPassword.ValueString(),
+		HTTPUser:    m.HTTPUser.ValueString(),
 		MailAddress: m.MailAddress.ValueString(), MailCondition: m.MailCondition.ValueString(),
 		MailSubject: m.MailSubject.ValueString(), Active: m.Active.ValueBool(),
 	}
@@ -195,7 +195,7 @@ func (r *cronjobResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	id, err := r.client.Cronjobs.Create(ctx, plan.job())
+	id, err := r.client.Cronjobs.Create(ctx, plan.job(), plan.HTTPPassword.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create cronjob", err.Error())
 		return
@@ -237,7 +237,7 @@ func (r *cronjobResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 	plan.ID = state.ID
-	if err := r.client.Cronjobs.Update(ctx, plan.job()); err != nil {
+	if err := r.client.Cronjobs.Update(ctx, plan.job(), plan.HTTPPassword.ValueString()); err != nil {
 		resp.Diagnostics.AddError("Failed to update cronjob", err.Error())
 		return
 	}

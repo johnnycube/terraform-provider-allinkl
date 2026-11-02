@@ -146,7 +146,7 @@ func (r *subdomainResource) Create(ctx context.Context, req resource.CreateReque
 
 	hs := plan.settings().changes(nil)
 	hs.Active = nil
-	err := r.client.Subdomains.CreateWithSettings(ctx, plan.Name.ValueString(), plan.Domain.ValueString(), hs)
+	err := r.client.Subdomains.Create(ctx, plan.Name.ValueString(), plan.Domain.ValueString(), hs)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create subdomain", err.Error())
 		return
