@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.4 (2026-11-02)
+
+Built on [kasapi](https://github.com/johnnycube/kasapi) v0.6.0. No changes to
+the schemas of resources or data sources.
+
+Fixed, through the library:
+
+- The flood delay between KAS requests is read where KAS reports it. The
+  provider waited a fixed 2 s between calls before; it now waits what the
+  server asks for, which makes most applies faster.
+- A resource is removed from state only when KAS names it as missing. A fault
+  about a missing prerequisite, such as the account or the domain of a mail
+  address, is reported as an error instead of being taken for a deleted
+  resource.
+- A malformed KAS response is reported by its shape, never its content, so
+  request parameters and passwords cannot end up in the provider's error
+  output.
+- The HTTP client refuses redirects and takes the proxy settings of the
+  environment. The endpoint overrides `KAS_API_ENDPOINT` and
+  `KAS_AUTH_ENDPOINT` must be https, except on the loopback interface.
+
+Internal: the cronjob password is passed to the library separately from the
+job, and subdomains are created through the library's new `Create`.
+
 ## v0.3.3 (2026-10-21)
 
 Built on [kasapi](https://github.com/johnnycube/kasapi) v0.3.4. No changes to
