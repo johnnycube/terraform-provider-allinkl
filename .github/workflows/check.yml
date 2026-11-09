@@ -52,7 +52,7 @@ jobs:
       - name: fleetlint (the check target runs it)
         env:
           # renovate: datasource=go depName=github.com/fleetlint/fleetlint
-          FLEETLINT_VERSION: v0.9.0
+          FLEETLINT_VERSION: v0.10.0
         run: go install "github.com/fleetlint/fleetlint/cmd/fleetlint@${FLEETLINT_VERSION}"
       - run: make check
 
