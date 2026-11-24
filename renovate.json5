@@ -22,6 +22,9 @@
 
   // Supply-chain caution; security fixes bypass this (vulnerabilityAlerts).
   minimumReleaseAge: '3 days',
+  // Digest pins and lock file maintenance carry no release timestamp; without
+  // this their renovate/stability-days status stays pending forever.
+  minimumReleaseAgeBehaviour: 'timestamp-optional',
 
   postUpdateOptions: ['gomodTidy', 'gomodUpdateImportPaths'],
 
